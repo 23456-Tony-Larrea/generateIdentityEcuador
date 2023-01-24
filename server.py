@@ -1,4 +1,4 @@
-from flask import *
+from flask import Flask , request,render_template
 import requests
 import json
 import psycopg2
@@ -7,25 +7,26 @@ app = Flask(__name__)
 app.config['ERROR_MESSAGE']=""
 
 
-@app.route('/',methods=['GET','POST'])
+@app.route('/',methods=['GET'])
 def index():
-    
-    if request.method == 'POST':
-        id = generate_random_id()
-        is_valid, message = validate_ecuador_id(id)
-        if is_valid:
-            info = get_person_info(id)
-            if info:
-                save_to_db(info)
-                return "Guardado en la base de datos"
-           
+    return render_template('index.html')
+
+@app.route('/validate',methods=['POST'])    
+def validate():
+        iterations = int(request.form['iterations'])
+        for i in range(iterations):
+            id = generate_random_id()
+            is_valid, message = validate_ecuador_id(id)
+            if is_valid:
+                info = get_person_info(id)
+                if info:
+                    save_to_db(info)
+                    print(f'Guardado en la base de datos: {id}')
+            else:
+                print(f'No se pudo obtener información para: {id}')
         else:
-            return message
-    return '''<form method="POST">
-                <input type="submit" value="Submit"><br>
-                     
-               </form>
-                '''
+            print(f'Cédula inválida: {id}')
+        return 'Proceso finalizado'
 def generate_random_id():
     region = random.randint(1,24)
     if region < 10:
@@ -93,12 +94,36 @@ def save_to_db(info):
                                  password="123456",
                                  host="localhost",
                                  port="5432",
-                                 database="testEcuador")
+                                 database="identityEcuador")
     cursor= connection.cursor()
-    query = """INSERT INTO person_info (cedula, nombre_completo, apellido_paterno, apellido_materno, primer_nombre, segundo_nombre, genero, condicion_ciudadano, fecha_nacimiento, lugar_nacimiento, nacionalidad, estado_civil, conyuge, domicilio, calles_domicilio, numero_casa, fecha_matrimonio, lugar_matrimonio, fecha_nacimiento_date, apellidos, nombres, provincia_domicilio, ciudad_domicilio, parroquia_domicilio, provincia_lugar_nacimiento, ciudad_lugar_nacimiento, parroquia_lugar_nacimiento)
+    if    "segundoNombre" in info:
+            segundoNombre = info["segundoNombre"]
+    else:
+        segundoNombre = None
+    
+    if "apellidoMaterno" in info:
+        apellidoMaterno = info["apellidoMaterno"]
+    else:
+        apellidoMaterno = None
+    
+    if "apellidoPaterno" in info:
+        apellidoPaterno = info["apellidoPaterno"]
+    else:
+        apellidoPaterno= None
+        
+    query = """INSERT INTO person_info (cedula, nombre_completo,apellido_paterno,apellido_materno, primer_nombre,
+            segundo_nombre, genero, condicion_ciudadano,fecha_nacimiento, lugar_nacimiento, nacionalidad, estado_civil, conyuge, domicilio, calles_domicilio, numero_casa, fecha_matrimonio, lugar_matrimonio, fecha_nacimiento_date, apellidos, nombres, provincia_domicilio, ciudad_domicilio, parroquia_domicilio, provincia_lugar_nacimiento, ciudad_lugar_nacimiento, parroquia_lugar_nacimiento)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-    values = (info["cedula"], info["nombreCompleto"], info["apellidoPaterno"], info["apellidoMaterno"], info["primerNombre"], info["segundoNombre"], info["genero"], info["condicionCiudadano"], info["fechaNacimiento"], info["lugarNacimiento"], info["nacionalidad"], info["estadoCivil"], info["conyuge"], info["domicilio"], info["callesDomicilio"], info["numeroCasa"], info["fechaMatrimonio"], info["lugarMatrimonio"], info["fechaNacimientoDate"], info["apellidos"], info["nombres"],
-              info["provinciaDomicilio"], info["ciudadDomicilio"], info["parroquiaDomicilio"], info["provinciaLugarNacimiento"], info["ciudadLugarNacimiento"], info["parroquiaLugarNacimiento"])
+    values = (
+                info["cedula"], info["nombreCompleto"], apellidoPaterno,apellidoMaterno,
+              info["primerNombre"], segundoNombre, info["genero"], info["condicionCiudadano"], 
+              info["fechaNacimiento"], info["lugarNacimiento"], info["nacionalidad"], info["estadoCivil"],
+              info["conyuge"], info["domicilio"], info["callesDomicilio"], info["numeroCasa"],
+              info["fechaMatrimonio"], info["lugarMatrimonio"], info["fechaNacimientoDate"], 
+              info["apellidos"], 
+              info["nombres"],
+              info["provinciaDomicilio"], info["ciudadDomicilio"], info["parroquiaDomicilio"], 
+              info["provinciaLugarNacimiento"], info["ciudadLugarNacimiento"], info["parroquiaLugarNacimiento"])
     
     cursor.execute(query, values)
     connection.commit()
